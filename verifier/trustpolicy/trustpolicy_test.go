@@ -29,7 +29,7 @@ import (
 func dummyPolicyStatement() (policyStatement TrustPolicy) {
 	policyStatement = TrustPolicy{
 		Name:                  "test-statement-name",
-		RegistryScopes:        []string{"registry.acme-rockets.io/software/net-monitor"},
+		Scopes:                []string{"registry.acme-rockets.io/software/net-monitor"},
 		SignatureVerification: SignatureVerification{VerificationLevel: "strict"},
 		TrustStores:           []string{"ca:valid-trust-store", "signingAuthority:valid-trust-store"},
 		TrustedIdentities:     []string{"x509.subject:CN=Notation Test Root,O=Notary,L=Seattle,ST=WA,C=US"},
@@ -53,12 +53,12 @@ func TestValidateValidPolicyDocument(t *testing.T) {
 
 	policyStatement2 := dummyPolicyStatement()
 	policyStatement2.Name = "test-statement-name-2"
-	policyStatement2.RegistryScopes = []string{"registry.wabbit-networks.io/software/unsigned/net-utils"}
+	policyStatement2.Scopes = []string{"registry.wabbit-networks.io/software/unsigned/net-utils"}
 	policyStatement2.SignatureVerification = SignatureVerification{VerificationLevel: "permissive"}
 
 	policyStatement3 := dummyPolicyStatement()
 	policyStatement3.Name = "test-statement-name-3"
-	policyStatement3.RegistryScopes = []string{"registry.acme-rockets.io/software/legacy/metrics"}
+	policyStatement3.Scopes = []string{"registry.acme-rockets.io/software/legacy/metrics"}
 	policyStatement3.TrustStores = []string{}
 	policyStatement3.TrustedIdentities = []string{}
 	policyStatement3.SignatureVerification = SignatureVerification{VerificationLevel: "skip"}
@@ -66,12 +66,12 @@ func TestValidateValidPolicyDocument(t *testing.T) {
 	policyStatement4 := dummyPolicyStatement()
 	policyStatement4.Name = "test-statement-name-4"
 	policyStatement4.TrustStores = []string{"ca:valid-trust-store", "signingAuthority:valid-trust-store-2"}
-	policyStatement4.RegistryScopes = []string{"*"}
+	policyStatement4.Scopes = []string{"*"}
 	policyStatement4.SignatureVerification = SignatureVerification{VerificationLevel: "audit"}
 
 	policyStatement5 := dummyPolicyStatement()
 	policyStatement5.Name = "test-statement-name-5"
-	policyStatement5.RegistryScopes = []string{"registry.acme-rockets2.io/software"}
+	policyStatement5.Scopes = []string{"registry.acme-rockets2.io/software"}
 	policyStatement5.TrustedIdentities = []string{"*"}
 	policyStatement5.SignatureVerification = SignatureVerification{VerificationLevel: "strict"}
 
@@ -192,8 +192,8 @@ func TestValidateTrustedIdentities(t *testing.T) {
 	}
 }
 
-// TestInvalidRegistryScopes tests invalid scopes are rejected
-func TestInvalidRegistryScopes(t *testing.T) {
+// TestInvalidScopes tests invalid scopes are rejected
+func TestInvalidScopes(t *testing.T) {
 	invalidScopes := []string{
 		"", "1:1", "a,b", "abcd", "1111", "1,2", "example.com/rep:tag",
 		"example.com/rep/subrep/sub:latest", "example.com", "rep/rep2:latest",
@@ -203,11 +203,11 @@ func TestInvalidRegistryScopes(t *testing.T) {
 	for _, scope := range invalidScopes {
 		policyDoc := dummyPolicyDocument()
 		policyStatement := dummyPolicyStatement()
-		policyStatement.RegistryScopes = []string{scope}
+		policyStatement.Scopes = []string{scope}
 		policyDoc.TrustPolicies = []TrustPolicy{policyStatement}
 		err := policyDoc.Validate()
-		if err == nil || err.Error() != "registry scope \""+scope+"\" is not valid, make sure it is a fully qualified repository without the scheme, protocol or tag. For example domain.com/my/repository or a local scope like local/myOCILayout" {
-			t.Fatalf("invalid registry scope should return error. Error : %q", err)
+		if err == nil || err.Error() != "scope \""+scope+"\" is not valid, make sure it is a fully qualified repository without the scheme, protocol or tag. For example domain.com/my/repository or a local scope like local/myOCILayout" {
+			t.Fatalf("invalid scope should return error. Error : %q", err)
 		}
 	}
 
@@ -217,17 +217,17 @@ func TestInvalidRegistryScopes(t *testing.T) {
 	for _, scope := range invalidWildCardScopes {
 		policyDoc := dummyPolicyDocument()
 		policyStatement := dummyPolicyStatement()
-		policyStatement.RegistryScopes = []string{scope}
+		policyStatement.Scopes = []string{scope}
 		policyDoc.TrustPolicies = []TrustPolicy{policyStatement}
 		err := policyDoc.Validate()
-		if err == nil || err.Error() != "registry scope \""+scope+"\" with wild card(s) is not valid, make sure it is a fully qualified repository without the scheme, protocol or tag. For example domain.com/my/repository or a local scope like local/myOCILayout" {
-			t.Fatalf("invalid registry scope should return error. Error : %q", err)
+		if err == nil || err.Error() != "scope \""+scope+"\" with wild card(s) is not valid, make sure it is a fully qualified repository without the scheme, protocol or tag. For example domain.com/my/repository or a local scope like local/myOCILayout" {
+			t.Fatalf("invalid scope should return error. Error : %q", err)
 		}
 	}
 }
 
-// TestValidRegistryScopes tests valid scopes are accepted
-func TestValidRegistryScopes(t *testing.T) {
+// TestValidScopes tests valid scopes are accepted
+func TestValidScopes(t *testing.T) {
 	validScopes := []string{
 		"*", "example.com/rep", "example.com:8080/rep/rep2", "example.com/rep/subrep/subsub",
 		"10.10.10.10:8080/rep/rep2", "domain/rep", "domain:1234/rep",
@@ -236,11 +236,11 @@ func TestValidRegistryScopes(t *testing.T) {
 	for _, scope := range validScopes {
 		policyDoc := dummyPolicyDocument()
 		policyStatement := dummyPolicyStatement()
-		policyStatement.RegistryScopes = []string{scope}
+		policyStatement.Scopes = []string{scope}
 		policyDoc.TrustPolicies = []TrustPolicy{policyStatement}
 		err := policyDoc.Validate()
 		if err != nil {
-			t.Fatalf("valid registry scope should not return error. Error : %q", err)
+			t.Fatalf("valid scope should not return error. Error : %q", err)
 		}
 	}
 }
@@ -281,35 +281,35 @@ func TestValidateInvalidPolicyDocument(t *testing.T) {
 		t.Fatalf("policy statement with no name should return an error")
 	}
 
-	// No Registry Scopes
+	// No Scopes
 	policyDoc = dummyPolicyDocument()
 	policyStatement = dummyPolicyStatement()
-	policyStatement.RegistryScopes = nil
+	policyStatement.Scopes = nil
 	policyDoc.TrustPolicies = []TrustPolicy{policyStatement}
 	err = policyDoc.Validate()
-	if err == nil || err.Error() != "trust policy statement \"test-statement-name\" has zero registry scopes, it must specify registry scopes with at least one value" {
-		t.Fatalf("policy statement with registry scopes should return error")
+	if err == nil || err.Error() != "trust policy statement \"test-statement-name\" has zero scopes, it must specify scopes with at least one value" {
+		t.Fatalf("policy statement with scopes should return error")
 	}
 
-	// Multiple policy statements with same registry scope
+	// Multiple policy statements w:qith same scope
 	policyDoc = dummyPolicyDocument()
 	policyStatement1 := dummyPolicyStatement()
 	policyStatement2 := dummyPolicyStatement()
 	policyStatement2.Name = "test-statement-name-2"
 	policyDoc.TrustPolicies = []TrustPolicy{policyStatement1, policyStatement2}
 	err = policyDoc.Validate()
-	if err == nil || err.Error() != "registry scope \"registry.acme-rockets.io/software/net-monitor\" is present in multiple trust policy statements, one registry scope value can only be associated with one statement" {
-		t.Fatalf("Policy statements with same registry scope should return error %q", err)
+	if err == nil || err.Error() != "scope \"registry.acme-rockets.io/software/net-monitor\" is present in multiple trust policy statements, one scope value can only be associated with one statement" {
+		t.Fatalf("Policy statements with same scope should return error %q", err)
 	}
 
-	// Registry scopes with a wildcard
+	// Scopes with a wildcard
 	policyDoc = dummyPolicyDocument()
 	policyStatement = dummyPolicyStatement()
-	policyStatement.RegistryScopes = []string{"*", "registry.acme-rockets.io/software/net-monitor"}
+	policyStatement.Scopes = []string{"*", "registry.acme-rockets.io/software/net-monitor"}
 	policyDoc.TrustPolicies = []TrustPolicy{policyStatement}
 	err = policyDoc.Validate()
-	if err == nil || err.Error() != "trust policy statement \"test-statement-name\" uses wildcard registry scope '*', a wildcard scope cannot be used in conjunction with other scope values" {
-		t.Fatalf("policy statement with more than a wildcard registry scope should return error")
+	if err == nil || err.Error() != "trust policy statement \"test-statement-name\" uses wildcard scope '*', a wildcard scope cannot be used in conjunction with other scope values" {
+		t.Fatalf("policy statement with more than a wildcard scope should return error")
 	}
 
 	// Invlaid SignatureVerification
@@ -437,7 +437,7 @@ func TestValidateInvalidPolicyDocument(t *testing.T) {
 	policyDoc = dummyPolicyDocument()
 	policyStatement1 = dummyPolicyStatement()
 	policyStatement2 = dummyPolicyStatement()
-	policyStatement2.RegistryScopes = []string{"registry.acme-rockets.io/software/legacy/metrics"}
+	policyStatement2.Scopes = []string{"registry.acme-rockets.io/software/legacy/metrics"}
 	policyDoc.TrustPolicies = []TrustPolicy{policyStatement1, policyStatement2}
 	err = policyDoc.Validate()
 	if err == nil || err.Error() != "multiple trust policy statements use the same name \"test-statement-name\", statement names must be unique" {
@@ -525,36 +525,36 @@ func TestCustomVerificationLevel(t *testing.T) {
 	}
 }
 
-// TestApplicableTrustPolicy tests filtering policies against registry scopes
+// TestApplicableTrustPolicy tests filtering policies against scopes
 func TestApplicableTrustPolicy(t *testing.T) {
 	policyDoc := dummyPolicyDocument()
 
 	policyStatement := dummyPolicyStatement()
 	policyStatement.Name = "test-statement-name-1"
-	registryScope := "registry.wabbit-networks.io/software/unsigned/net-utils"
-	registryUri := fmt.Sprintf("%s@sha256:hash", registryScope)
-	policyStatement.RegistryScopes = []string{registryScope}
+	scope := "registry.wabbit-networks.io/software/unsigned/net-utils"
+	registryUri := fmt.Sprintf("%s@sha256:hash", scope)
+	policyStatement.Scopes = []string{scope}
 	policyStatement.SignatureVerification = SignatureVerification{VerificationLevel: "strict"}
 
 	policyDoc.TrustPolicies = []TrustPolicy{
 		policyStatement,
 	}
-	// existing Registry Scope
+	// existing Scope
 	policy, err := (&policyDoc).GetApplicableTrustPolicy(registryUri)
 	if policy.Name != policyStatement.Name || err != nil {
-		t.Fatalf("getApplicableTrustPolicy should return %q for registry scope %q", policyStatement.Name, registryScope)
+		t.Fatalf("getApplicableTrustPolicy should return %q for scope %q", policyStatement.Name, scope)
 	}
 
-	// non-existing Registry Scope
+	// non-existing Scope
 	policy, err = (&policyDoc).GetApplicableTrustPolicy("non.existing.scope/repo@sha256:hash")
-	if policy != nil || err == nil || err.Error() != "artifact \"non.existing.scope/repo@sha256:hash\" has no applicable trust policy. Trust policy applicability for a given artifact is determined by registryScopes. To create a trust policy, see: https://notaryproject.dev/docs/quickstart/#create-a-trust-policy" {
-		t.Fatalf("getApplicableTrustPolicy should return nil for non existing registry scope")
+	if policy != nil || err == nil || err.Error() != "artifact \"non.existing.scope/repo@sha256:hash\" has no applicable trust policy. Trust policy applicability for a given artifact is determined by scopes. To create a trust policy, see: https://notaryproject.dev/docs/quickstart/#create-a-trust-policy" {
+		t.Fatalf("getApplicableTrustPolicy should return nil for non existing scope")
 	}
 
-	// wildcard registry scope
+	// wildcard scope
 	wildcardStatement := dummyPolicyStatement()
 	wildcardStatement.Name = "test-statement-name-2"
-	wildcardStatement.RegistryScopes = []string{"*"}
+	wildcardStatement.Scopes = []string{"*"}
 	wildcardStatement.TrustStores = []string{}
 	wildcardStatement.TrustedIdentities = []string{}
 	wildcardStatement.SignatureVerification = SignatureVerification{VerificationLevel: "skip"}
@@ -565,7 +565,7 @@ func TestApplicableTrustPolicy(t *testing.T) {
 	}
 	policy, err = (&policyDoc).GetApplicableTrustPolicy("some.registry.that/has.no.policy@sha256:hash")
 	if policy.Name != wildcardStatement.Name || err != nil {
-		t.Fatalf("getApplicableTrustPolicy should return wildcard policy for registry scope \"some.registry.that/has.no.policy\"")
+		t.Fatalf("getApplicableTrustPolicy should return wildcard policy for scope \"some.registry.that/has.no.policy\"")
 	}
 }
 

@@ -150,8 +150,8 @@ type TrustPolicy struct {
 	// Name of the policy statement
 	Name string `json:"name"`
 
-	// RegistryScopes that this policy statement affects
-	RegistryScopes []string `json:"registryScopes"`
+	// Scopes that this policy statement affects
+	Scopes []string `json:"scopes"`
 
 	// SignatureVerification setting for this policy statement
 	SignatureVerification SignatureVerification `json:"signatureVerification"`
@@ -230,8 +230,8 @@ func (policyDoc *Document) Validate() error {
 
 	}
 
-	// Verify registry scopes are valid
-	if err := validateRegistryScopes(policyDoc); err != nil {
+	// Verify scopes are valid
+	if err := validateScopes(policyDoc); err != nil {
 		return err
 	}
 
@@ -247,7 +247,7 @@ func (policyDoc *Document) Validate() error {
 }
 
 // GetApplicableTrustPolicy returns a pointer to the deep copied TrustPolicy
-// statement that applies to the given registry scope. If no applicable trust
+// statement that applies to the given scope. If no applicable trust
 // policy is found, returns an error
 // see https://github.com/notaryproject/notaryproject/blob/v1.0.0-rc.2/specs/trust-store-trust-policy.md#selecting-a-trust-policy-based-on-artifact-uri
 func (trustPolicyDoc *Document) GetApplicableTrustPolicy(artifactReference string) (*TrustPolicy, error) {
@@ -259,23 +259,23 @@ func (trustPolicyDoc *Document) GetApplicableTrustPolicy(artifactReference strin
 	var wildcardPolicy *TrustPolicy
 	var applicablePolicy *TrustPolicy
 	for _, policyStatement := range trustPolicyDoc.TrustPolicies {
-		if slices.Contains(policyStatement.RegistryScopes, trustpolicy.Wildcard) {
+		if slices.Contains(policyStatement.Scopes, trustpolicy.Wildcard) {
 			// we need to deep copy because we can't use the loop variable
 			// address. see https://stackoverflow.com/a/45967429
 			wildcardPolicy = (&policyStatement).clone()
-		} else if slices.Contains(policyStatement.RegistryScopes, artifactPath) {
+		} else if slices.Contains(policyStatement.Scopes, artifactPath) {
 			applicablePolicy = (&policyStatement).clone()
 		}
 	}
 
 	if applicablePolicy != nil {
-		// a policy with exact match for registry scope takes precedence over
+		// a policy with exact match for scope takes precedence over
 		// a wildcard (*) policy.
 		return applicablePolicy, nil
 	} else if wildcardPolicy != nil {
 		return wildcardPolicy, nil
 	} else {
-		return nil, fmt.Errorf("artifact %q has no applicable trust policy. Trust policy applicability for a given artifact is determined by registryScopes. To create a trust policy, see: %s", artifactReference, trustPolicyLink)
+		return nil, fmt.Errorf("artifact %q has no applicable trust policy. Trust policy applicability for a given artifact is determined by scopes. To create a trust policy, see: %s", artifactReference, trustPolicyLink)
 	}
 }
 
@@ -394,7 +394,7 @@ func (t *TrustPolicy) clone() *TrustPolicy {
 	return &TrustPolicy{
 		Name:                  t.Name,
 		SignatureVerification: t.SignatureVerification,
-		RegistryScopes:        append([]string(nil), t.RegistryScopes...),
+		Scopes:                append([]string(nil), t.Scopes...),
 		TrustedIdentities:     append([]string(nil), t.TrustedIdentities...),
 		TrustStores:           append([]string(nil), t.TrustStores...),
 	}
@@ -465,32 +465,32 @@ func validateTrustedIdentities(statement TrustPolicy) error {
 	return nil
 }
 
-// validateRegistryScopes validates if the policy document is following the
-// Notary Project spec rules for registry scopes
-func validateRegistryScopes(policyDoc *Document) error {
-	registryScopeCount := make(map[string]int)
+// validateScopes validates if the policy document is following the
+// Notary Project spec rules for scopes
+func validateScopes(policyDoc *Document) error {
+	scopeCount := make(map[string]int)
 	for _, statement := range policyDoc.TrustPolicies {
-		// Verify registry scopes are valid
-		if len(statement.RegistryScopes) == 0 {
-			return fmt.Errorf("trust policy statement %q has zero registry scopes, it must specify registry scopes with at least one value", statement.Name)
+		// Verify scopes are valid
+		if len(statement.Scopes) == 0 {
+			return fmt.Errorf("trust policy statement %q has zero scopes, it must specify scopes with at least one value", statement.Name)
 		}
-		if len(statement.RegistryScopes) > 1 && slices.Contains(statement.RegistryScopes, trustpolicy.Wildcard) {
-			return fmt.Errorf("trust policy statement %q uses wildcard registry scope '*', a wildcard scope cannot be used in conjunction with other scope values", statement.Name)
+		if len(statement.Scopes) > 1 && slices.Contains(statement.Scopes, trustpolicy.Wildcard) {
+			return fmt.Errorf("trust policy statement %q uses wildcard scope '*', a wildcard scope cannot be used in conjunction with other scope values", statement.Name)
 		}
-		for _, scope := range statement.RegistryScopes {
+		for _, scope := range statement.Scopes {
 			if scope != trustpolicy.Wildcard {
-				if err := validateRegistryScopeFormat(scope); err != nil {
+				if err := validateScopeFormat(scope); err != nil {
 					return err
 				}
 			}
-			registryScopeCount[scope]++
+			scopeCount[scope]++
 		}
 	}
 
-	// Verify one policy statement per registry scope
-	for key := range registryScopeCount {
-		if registryScopeCount[key] > 1 {
-			return fmt.Errorf("registry scope %q is present in multiple trust policy statements, one registry scope value can only be associated with one statement", key)
+	// Verify one policy statement per scope
+	for key := range scopeCount {
+		if scopeCount[key] > 1 {
+			return fmt.Errorf("scope %q is present in multiple trust policy statements, one scope value can only be associated with one statement", key)
 		}
 	}
 
@@ -530,7 +530,7 @@ func getArtifactPathFromReference(artifactReference string) (string, error) {
 	}
 
 	artifactPath := artifactReference[:i]
-	if err := validateRegistryScopeFormat(artifactPath); err != nil {
+	if err := validateScopeFormat(artifactPath); err != nil {
 		return "", err
 	}
 	return artifactPath, nil
@@ -542,17 +542,17 @@ type parsedDN struct {
 	ParsedMap map[string]string
 }
 
-// validateRegistryScopeFormat validates if a scope is following the format
+// validateScopeFormat validates if a scope is following the format
 // defined in distribution spec
-func validateRegistryScopeFormat(scope string) error {
+func validateScopeFormat(scope string) error {
 	// Domain and Repository regexes are adapted from distribution
 	// implementation
 	// https://github.com/distribution/distribution/blob/main/reference/regexp.go#L31
 	domainRegexp := regexp.MustCompile(`^(?:[a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9])(?:(?:\.(?:[a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9]))+)?(?::[0-9]+)?$`)
 	repositoryRegexp := regexp.MustCompile(`^[a-z0-9]+(?:(?:(?:[._]|__|[-]*)[a-z0-9]+)+)?(?:(?:/[a-z0-9]+(?:(?:(?:[._]|__|[-]*)[a-z0-9]+)+)?)+)?$`)
 	ensureMessage := "make sure it is a fully qualified repository without the scheme, protocol or tag. For example domain.com/my/repository or a local scope like local/myOCILayout"
-	errorMessage := "registry scope %q is not valid, " + ensureMessage
-	errorWildCardMessage := "registry scope %q with wild card(s) is not valid, " + ensureMessage
+	errorMessage := "scope %q is not valid, " + ensureMessage
+	errorWildCardMessage := "scope %q with wild card(s) is not valid, " + ensureMessage
 
 	// Check for presence of * in scope
 	if len(scope) > 1 && strings.Contains(scope, "*") {
